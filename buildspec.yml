@@ -4,7 +4,7 @@ phases:
   pre_build:
     commands:
       - echo "Starting build..."
-      - echo "Branch is $CODEBUILD_WEBHOOK_HEAD_REF"
+      - echo "Checking website files..."
       - test -f index.html
       - test -d images
 
@@ -15,5 +15,13 @@ phases:
 
   post_build:
     commands:
-      - echo "Build and tests completed."
-      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 131696161928.dkr.ecr.us-east-2.amazonaws.com && docker tag abode-webapp:latest 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest && docker push 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest; else echo "Develop branch: testing only. No production image pushed."; fi
+      - echo "Build completed successfully."
+      - |
+        if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then
+          echo "Master branch detected. Uploading image to ECR."
+          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 131696161928.dkr.ecr.us-east-2.amazonaws.com
+          docker tag abode-webapp:latest 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest
+          docker push 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest
+        else
+          echo "Develop branch detected. Testing only."
+        fi
