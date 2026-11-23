@@ -3,15 +3,17 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "Starting build process"
+      - echo "Starting build..."
       - echo "Branch is $CODEBUILD_WEBHOOK_HEAD_REF"
+      - test -f index.html
+      - test -d images
 
   build:
     commands:
-      - echo "Building Docker image"
+      - echo "Building Docker image..."
       - docker build -t abode-webapp .
 
   post_build:
     commands:
-      - echo "Build completed successfully"
-      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then echo "MASTER branch - production deployment"; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/develop" ]; then echo "DEVELOP branch - testing only"; fi
+      - echo "Build and tests completed."
+      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 131696161928.dkr.ecr.us-east-2.amazonaws.com && docker tag abode-webapp:latest 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest && docker push 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest; else echo "Develop branch: testing only. No production image pushed."; fi
