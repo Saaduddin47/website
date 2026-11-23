@@ -3,21 +3,15 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "Starting build process..."
-      - echo "Branch: $CODEBUILD_WEBHOOK_HEAD_REF"
+      - echo "Starting build process"
+      - echo "Branch is $CODEBUILD_WEBHOOK_HEAD_REF"
 
   build:
     commands:
-      - echo "Building Docker image..."
+      - echo "Building Docker image"
       - docker build -t abode-webapp .
 
   post_build:
     commands:
-      - echo "Build completed successfully."
-      - echo "Branch: $CODEBUILD_WEBHOOK_HEAD_REF"
-      - |
-        if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then
-          echo "Master branch detected - production deployment will run here."
-        elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/develop" ]; then
-          echo "Develop branch detected - testing only."
-        fi
+      - echo "Build completed successfully"
+      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then echo "MASTER branch - production deployment"; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/develop" ]; then echo "DEVELOP branch - testing only"; fi
