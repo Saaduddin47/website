@@ -1,10 +1,11 @@
+
 version: 0.2
 
 phases:
   pre_build:
     commands:
       - echo "Starting build..."
-      - echo "Checking website files..."
+      - echo "Branch is $CODEBUILD_WEBHOOK_HEAD_REF"
       - test -f index.html
       - test -d images
 
@@ -15,13 +16,65 @@ phases:
 
   post_build:
     commands:
-      - echo "Build completed successfully."
       - |
+        set -eo pipefail
+
         if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then
-          echo "Master branch detected. Uploading image to ECR."
+          echo "MASTER: Pushing image to ECR."
+
           aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 131696161928.dkr.ecr.us-east-2.amazonaws.com
+
           docker tag abode-webapp:latest 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest
+
           docker push 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest
+
+          echo "Starting production deployment through SSM."
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region us-east-2 \
+            --instance-ids i-05a643776b1b7397a \
+            --document-name "AWS-RunShellScript" \
+            --comment "Abode production deployment" \
+            --parameters '{"commands":["aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 131696161928.dkr.ecr.us-east-2.amazonaws.com","docker pull 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest","docker rm -f abode-production || true","docker run -d --name abode-production -p 80:80 --restart always 131696161928.dkr.ecr.us-east-2.amazonaws.com/abode-webapp:latest","docker image prune -f"]}' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          STATUS="Pending"
+
+          for attempt in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --region us-east-2 \
+              --command-id "$COMMAND_ID" \
+              --instance-id i-05a643776b1b7397a \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Deployment status: $STATUS"
+
+            if [ "$STATUS" = "Success" ]; then
+              break
+            fi
+
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Undeliverable" ]; then
+              aws ssm get-command-invocation \
+                --region us-east-2 \
+                --command-id "$COMMAND_ID" \
+                --instance-id i-05a643776b1b7397a
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Production deployment timed out."
+            exit 1
+          fi
+
+          echo "Production deployment successful."
+
         else
-          echo "Develop branch detected. Testing only."
+          echo "DEVELOP: Build and test only. No production deployment."
         fi
