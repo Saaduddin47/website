@@ -17,7 +17,7 @@ phases:
   post_build:
     commands:
       - |
-        set -eo pipefail
+        set -e
 
         if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/master" ]; then
           echo "MASTER: Pushing image to ECR."
