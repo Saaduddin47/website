@@ -31,7 +31,7 @@ phases:
           echo "Starting production deployment through SSM."
 
           COMMAND_ID=$(aws ssm send-command \
-            --region us-east-2 \
+            --region us-east-1 \
             --instance-ids i-05a643776b1b7397a \
             --document-name "AWS-RunShellScript" \
             --comment "Abode production deployment" \
@@ -45,7 +45,7 @@ phases:
 
           for attempt in $(seq 1 60); do
             STATUS=$(aws ssm get-command-invocation \
-              --region us-east-2 \
+              --region us-east-1 \
               --command-id "$COMMAND_ID" \
               --instance-id i-05a643776b1b7397a \
               --query "Status" \
@@ -59,7 +59,7 @@ phases:
 
             if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Undeliverable" ]; then
               aws ssm get-command-invocation \
-                --region us-east-2 \
+                --region us-east-1 \
                 --command-id "$COMMAND_ID" \
                 --instance-id i-05a643776b1b7397a
               exit 1
